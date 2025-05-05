@@ -92,6 +92,7 @@ check_main_func_type(const WASMFuncType *type, bool is_memory64)
 static bool
 execute_main(WASMModuleInstanceCommon *module_inst, int32 argc, char *argv[])
 {
+    printf("DEBUG: Inside execute_main function\n");
     WASMFunctionInstanceCommon *func;
     WASMFuncType *func_type = NULL;
     WASMExecEnv *exec_env = NULL;
@@ -263,7 +264,10 @@ execute_main(WASMModuleInstanceCommon *module_inst, int32 argc, char *argv[])
         }
     }
 
+    printf("DEBUG: About to call wasm_runtime_call_wasm\n");
     ret = wasm_runtime_call_wasm(exec_env, func, argc1, argv1);
+    printf("DEBUG: After wasm_runtime_call_wasm call\n");
+    
     if (ret && func_type->result_count > 0 && argc > 0 && argv)
         /* copy the return value */
         *(int *)argv = (int)argv1[0];

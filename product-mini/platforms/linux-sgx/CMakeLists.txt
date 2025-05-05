@@ -11,6 +11,8 @@ set (WAMR_BUILD_PLATFORM "linux-sgx")
 set (CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 set (CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
+option(WAMR_BUILD_LIBRARY "Build as a library instead of executable" OFF)
+
 # Set WAMR_BUILD_TARGET
 if (NOT DEFINED WAMR_BUILD_TARGET)
   if (CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -29,7 +31,7 @@ if (NOT DEFINED WAMR_BUILD_TARGET)
 endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+  set(CMAKE_BUILD_TYPE Debug)
 endif ()
 
 if (NOT DEFINED WAMR_BUILD_INTERP)
@@ -103,10 +105,20 @@ if (NOT DEFINED WAMR_BUILD_REF_TYPES)
   set (WAMR_BUILD_REF_TYPES 1)
 endif ()
 
+if (NOT DEFINED WASM_ENABLE_LINUX_PERF)
+
+  set (WASM_ENABLE_LINUX_PERF 0)
+endif ()
+
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -ffunction-sections -fdata-sections \
                                      -Wall -Wno-unused-parameter -Wno-pedantic \
                                      -nostdinc -fvisibility=hidden -fpie" )
+
+if (WAMR_BUILD_LIBRARY)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+endif ()
 
 set (WAMR_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 
@@ -175,6 +187,7 @@ else()
     )
 endif()
 
+
 if (WAMR_BUILD_LIBC_WASI EQUAL 1)
     execute_process(
         COMMAND bash -c "sed -i -E 's/^WAMR_BUILD_LIBC_WASI = 0/WAMR_BUILD_LIBC_WASI = 1/g' ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/Makefile"
@@ -187,9 +200,77 @@ else()
     )
 endif()
 
-if (WAMR_BUILD_SPEC_TEST EQUAL 1)
+if (DEFINED WASM_ENABLE_LINUX_PERF)
     execute_process(
-        COMMAND bash -c "sed -i -E 's/<ReservedMemMaxSize>0x1000000<\\/ReservedMemMaxSize>/<ReservedMemMaxSize>0x8000000<\\/ReservedMemMaxSize>/g' ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/Enclave/Enclave.config.xml"
+        COMMAND bash -c "sed -i -E 's/^WAMR_ENABLE_LINUX_PERF = .*/WAMR_ENABLE_LINUX_PERF = ${WASM_ENABLE_LINUX_PERF}/g' ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/Makefile"
         OUTPUT_VARIABLE cmdOutput
     )
+else()
+    execute_process(
+        COMMAND bash -c "sed -i -E 's/^WAMR_ENABLE_LINUX_PERF = .*/WAMR_ENABLE_LINUX_PERF = 0/g' ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/Makefile"
+        OUTPUT_VARIABLE cmdOutput
+    )
+endif()
+
+if (WAMR_BUILD_SPEC_TEST EQUAL 1)
+    execute_process(
+        COMMAND bash -c "sed -i -E 's/<ReservedMemMaxSize>0x1000000<\\/ReservedMemMaxSize>/<ReservedMemMaxSize>0x80000000<\\/ReservedMemMaxSize>/g' ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/Enclave/Enclave.config.xml"
+        OUTPUT_VARIABLE cmdOutput
+    )
+endif()
+
+
+if (WAMR_BUILD_LIBRARY)
+
+    execute_process(
+        COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample && SGX_SDK=$ENV{SGX_SDK} make App/Enclave_u.c"
+        RESULT_VARIABLE enclave_gen_result
+    )
+
+    if (NOT "${enclave_gen_result}" STREQUAL "0")
+        message(FATAL_ERROR "Failed to generate Enclave_u.c. Please run 'cd ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample && make App/Enclave_u.c' manually and try again.")
+    endif()
+
+
+    add_library(wamr_sgx STATIC
+                wamr_sgx_lib.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/App/Enclave_u.c)
+
+
+    add_dependencies(wamr_sgx vmlib_untrusted)
+
+    target_include_directories(wamr_sgx PRIVATE
+                              ${CMAKE_CURRENT_SOURCE_DIR}/enclave-sample/App
+                              ${CMAKE_CURRENT_SOURCE_DIR}/../../core/iwasm/include
+                              $ENV{SGX_SDK}/include)
+
+
+    if(DEFINED ENV{SGX_MODE} AND "$ENV{SGX_MODE}" STREQUAL "HW")
+        set(SGX_MODE_SIM FALSE)
+    else()
+        set(SGX_MODE_SIM TRUE)
+    endif()
+
+    if(SGX_MODE_SIM)
+        message(STATUS "Building SGX in simulation mode")
+        target_link_libraries(wamr_sgx
+                            ${CMAKE_CURRENT_BINARY_DIR}/libvmlib_untrusted.a
+                            $ENV{SGX_SDK}/lib64/libsgx_urts_sim.so
+                            $ENV{SGX_SDK}/lib64/libsgx_uae_service_sim.so
+                            -lpthread)
+    else()
+        message(STATUS "Building SGX in hardware mode")
+        target_link_libraries(wamr_sgx
+                            ${CMAKE_CURRENT_BINARY_DIR}/libvmlib_untrusted.a
+                            $ENV{SGX_SDK}/lib64/libsgx_urts.so
+                            $ENV{SGX_SDK}/lib64/libsgx_uae_service.so
+                            -lpthread)
+    endif()
+
+
+    install(TARGETS wamr_sgx
+            ARCHIVE DESTINATION lib)
+
+    install(FILES wamr_sgx_lib.h
+            DESTINATION include)
 endif()

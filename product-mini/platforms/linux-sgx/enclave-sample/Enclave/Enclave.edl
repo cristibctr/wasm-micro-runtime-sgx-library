@@ -19,12 +19,42 @@ enclave {
 #endif
 
     trusted {
-        /* define ECALLs here. */
+        /* Original ECALLs */
         public void ecall_handle_command(unsigned cmd,
-                                         [in, out, size=cmd_buf_size]uint8_t *cmd_buf,
-                                         unsigned cmd_buf_size);
+                                       [in, out, size=cmd_buf_size]uint8_t *cmd_buf,
+                                       unsigned cmd_buf_size);
         public void ecall_iwasm_main([user_check]uint8_t *wasm_file_buf,
-                                     uint32_t wasm_file_size);
+                                   uint32_t wasm_file_size);
+                                   
+        /* New library interface for Rust FFI */
+        public int ecall_init_runtime(uint32_t max_thread_num);
+        public int ecall_destroy_runtime();
+        
+        public int ecall_load_module([user_check]uint8_t *wasm_buffer, 
+                                  uint32_t wasm_buffer_size,
+                                  [out, size=error_buf_size]char *error_buf,
+                                  uint32_t error_buf_size,
+                                  [out]uint64_t *module_handle);
+                                  
+        public int ecall_unload_module(uint64_t module_handle);
+        
+        public int ecall_instantiate_module(uint64_t module_handle,
+                                         uint32_t stack_size,
+                                         uint32_t heap_size,
+                                         [out, size=error_buf_size]char *error_buf,
+                                         uint32_t error_buf_size,
+                                         [out]uint64_t *instance_handle);
+                                         
+        public int ecall_destroy_instance(uint64_t instance_handle);
+        
+        public int ecall_call_function(uint64_t instance_handle,
+                                    [in, string]const char *function_name,
+                                    [in, size=params_size]uint8_t *params,
+                                    uint32_t params_size,
+                                    [out, size=results_size]uint8_t *results,
+                                    uint32_t results_size,
+                                    [out, size=error_buf_size]char *error_buf,
+                                    uint32_t error_buf_size);
     };
 
     untrusted {

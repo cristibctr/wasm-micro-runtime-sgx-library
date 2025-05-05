@@ -2293,7 +2293,6 @@ aot_lookup_function(const AOTModuleInstance *module_inst, const char *name)
 
     if (!export_funcs)
         return NULL;
-
     return bsearch(&key, export_funcs, module_inst->export_func_count,
                    sizeof(AOTFunctionInstance), cmp_func_inst);
 }

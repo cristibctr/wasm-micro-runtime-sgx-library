@@ -7,8 +7,9 @@ SGX_SDK ?= /opt/intel/sgxsdk
 SGX_SSL ?= /opt/intel/sgxssl
 SGX_MODE ?= SIM
 SGX_ARCH ?= x64
-SGX_DEBUG ?= 0
+SGX_DEBUG ?= 1
 SPEC_TEST ?= 0
+BUILD_LIB ?= 0
 
 # These variables are automatically set by CMakeLists.txt
 WAMR_BUILD_SGX_IPFS = 0
@@ -61,15 +62,20 @@ else
 	Urts_Library_Name := sgx_urts
 endif
 
-App_Cpp_Files := App/App.cpp
+ifeq ($(BUILD_LIB), 1)
+	App_Cpp_Files := 
+	App_C_Files := ../wamr_sgx_lib.c
+else
+	App_Cpp_Files := App/App.cpp
+endif
 App_Include_Paths := -IApp -I$(SGX_SDK)/include
 ifeq ($(WAMR_BUILD_LIB_RATS), 1)
 	App_Include_Paths += -I$(LIB_RATS_INCLUDE_DIR)
 endif
 
 App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths) \
-			   -DWASM_ENABLE_STATIC_PGO=$(WAMR_BUILD_STATIC_PGO) \
-			   -DWASM_ENABLE_LIBC_WASI=$(WAMR_BUILD_LIBC_WASI)
+				   -DWASM_ENABLE_STATIC_PGO=$(WAMR_BUILD_STATIC_PGO) \
+				   -DWASM_ENABLE_LIBC_WASI=$(WAMR_BUILD_LIBC_WASI)
 
 # Three configuration modes - Debug, prerelease, release
 #   Debug - Macro DEBUG enabled.
@@ -103,8 +109,13 @@ ifeq ($(WAMR_BUILD_LIB_RATS), 1)
 endif
 
 App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
+App_C_Objects := $(App_C_Files:.c=.o)
 
-App_Name := iwasm
+ifeq ($(BUILD_LIB), 1)
+	App_Name := libwamr_sgx.a
+else
+	App_Name := iwasm
+endif
 
 ######## Enclave Settings ########
 
@@ -126,6 +137,9 @@ Crypto_Library_Name := sgx_tcrypto
 WAMR_ROOT := $(CURDIR)/../../../../
 
 Enclave_Cpp_Files := Enclave/Enclave.cpp
+ifeq ($(BUILD_LIB), 1)
+	Enclave_Cpp_Files += Enclave/Enclave_library.cpp
+endif
 
 Enclave_Include_Paths := -IEnclave -I$(WAMR_ROOT)/core/iwasm/include \
                          -I$(WAMR_ROOT)/core/shared/utils \
@@ -139,12 +153,12 @@ ifeq ($(WAMR_BUILD_LIB_RATS), 1)
 endif
 
 Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden \
-				   -fpie -fstack-protector $(Enclave_Include_Paths) \
-				   -DWASM_GLOBAL_HEAP_SIZE=$(WAMR_BUILD_GLOBAL_HEAP_SIZE) \
-				   -DWASM_ENABLE_GLOBAL_HEAP_POOL=$(WAMR_BUILD_GLOBAL_HEAP_POOL) \
-				   -DWASM_ENABLE_LIB_RATS=$(WAMR_BUILD_LIB_RATS) \
-				   -DWASM_ENABLE_STATIC_PGO=$(WAMR_BUILD_STATIC_PGO) \
-				   -DWASM_ENABLE_LIBC_WASI=$(WAMR_BUILD_LIBC_WASI)
+					   -fpie -fstack-protector $(Enclave_Include_Paths) \
+					   -DWASM_GLOBAL_HEAP_SIZE=$(WAMR_BUILD_GLOBAL_HEAP_SIZE) \
+					   -DWASM_ENABLE_GLOBAL_HEAP_POOL=$(WAMR_BUILD_GLOBAL_HEAP_POOL) \
+					   -DWASM_ENABLE_LIB_RATS=$(WAMR_BUILD_LIB_RATS) \
+					   -DWASM_ENABLE_STATIC_PGO=$(WAMR_BUILD_STATIC_PGO) \
+					   -DWASM_ENABLE_LIBC_WASI=$(WAMR_BUILD_LIBC_WASI)
 ifeq ($(SPEC_TEST), 1)
 	Enclave_C_Flags += -DWASM_ENABLE_SPEC_TEST=1
 else
@@ -229,13 +243,28 @@ App/%.o: App/%.cpp
 	@$(CXX) $(App_Cpp_Flags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
+../%.o: ../%.c
+	@$(CC) $(App_C_Flags) -c $< -o $@
+	@echo "CC   <=  $<"
+
 libvmlib_untrusted.a: $(VMLIB_BUILD_DIR)/libvmlib_untrusted.a
 	@cp $< $@
 	@echo "CP $@  <=  $<"
 
-$(App_Name): App/Enclave_u.o $(App_Cpp_Objects) libvmlib_untrusted.a
+$(App_Name): App/Enclave_u.o $(App_Cpp_Objects) $(App_C_Objects) libvmlib_untrusted.a
+ifeq ($(BUILD_LIB), 1)
+	@rm -rf temp_ar && mkdir -p temp_ar && cd temp_ar && \
+	$(AR) x ../libvmlib_untrusted.a && \
+	cp ../App/Enclave_u.o . && \
+	for obj in $(App_Cpp_Objects) $(App_C_Objects); do cp ../$$obj .; done && \
+	rm -f ../$@ && \
+	$(AR) rcs ../$@ *.o && \
+	cd .. && rm -rf temp_ar
+	@echo "AR   =>  $@"
+else
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
+endif
 
 
 ######## Enclave Objects ########
@@ -266,4 +295,4 @@ $(Signed_Enclave_Name): $(Enclave_Name)
 .PHONY: clean
 
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libvmlib.a libvmlib_untrusted.a
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) $(App_C_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libvmlib.a libvmlib_untrusted.a

@@ -2314,11 +2314,13 @@ wasm_runtime_lookup_function(WASMModuleInstanceCommon *const module_inst,
                              const char *name)
 {
 #if WASM_ENABLE_INTERP != 0
+
     if (module_inst->module_type == Wasm_Module_Bytecode)
         return (WASMFunctionInstanceCommon *)wasm_lookup_function(
             (const WASMModuleInstance *)module_inst, name);
 #endif
 #if WASM_ENABLE_AOT != 0
+
     if (module_inst->module_type == Wasm_Module_AoT)
         return (WASMFunctionInstanceCommon *)aot_lookup_function(
             (const AOTModuleInstance *)module_inst, name);

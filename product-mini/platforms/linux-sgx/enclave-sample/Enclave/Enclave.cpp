@@ -92,7 +92,7 @@ set_error_buf(char *error_buf, uint32 error_buf_size, const char *string)
         snprintf(error_buf, error_buf_size, "%s", string);
 }
 
-static bool runtime_inited = false;
+bool runtime_inited = false;
 
 static void
 handle_cmd_init_runtime(uint64 *args, uint32 argc)
@@ -374,6 +374,7 @@ handle_cmd_instantiate_module(uint64 *args, uint32 argc)
     char *error_buf = *(char **)args++;
     uint32 error_buf_size = *(uint32 *)args++;
     wasm_module_inst_t module_inst;
+    char msg_buf[128];
 
     bh_assert(argc == 5);
 
@@ -381,14 +382,34 @@ handle_cmd_instantiate_module(uint64 *args, uint32 argc)
         *(void **)args_org = NULL;
         return;
     }
+    
+    if (stack_size < 2 * 1024 * 1024) {
+        stack_size = 2 * 1024 * 1024;
+    }
+    
+    if (heap_size < 8 * 1024 * 1024) {
+        heap_size = 8 * 1024 * 1024;
+    }
+    
+    snprintf(msg_buf, sizeof(msg_buf), 
+             "[SGX Enclave] Instantiating module with stack: %d KB, heap: %d KB\n", 
+             stack_size / 1024, heap_size / 1024);
+    enclave_print(msg_buf);
 
     if (!(module_inst =
               wasm_runtime_instantiate(enclave_module->module, stack_size,
                                        heap_size, error_buf, error_buf_size))) {
+        enclave_print("[SGX Enclave] Failed to instantiate module\n");
+        if (error_buf && error_buf[0]) {
+            enclave_print("[SGX Enclave] Error: ");
+            enclave_print(error_buf);
+            enclave_print("\n");
+        }
         *(void **)args_org = NULL;
         return;
     }
 
+    enclave_print("[SGX Enclave] Module instantiated successfully\n");
     *(wasm_module_inst_t *)args_org = module_inst;
 
     LOG_VERBOSE("Instantiate module success.\n");
@@ -444,6 +465,8 @@ handle_cmd_exec_app_main(uint64 *args, int32 argc)
     uint64 total_size;
     int32 i;
 
+    enclave_print("DEBUG: Inside handle_cmd_exec_app_main\n");
+    
     bh_assert(argc >= 3);
     bh_assert(app_argc >= 1);
 
@@ -463,7 +486,9 @@ handle_cmd_exec_app_main(uint64 *args, int32 argc)
         app_argv[i] = (char *)(uintptr_t)args[i];
     }
 
+    enclave_print("DEBUG: Before executing main\n");
     wasm_application_execute_main(module_inst, app_argc - 1, app_argv + 1);
+    enclave_print("DEBUG: After executing main\n");
 
     wasm_runtime_free(app_argv);
 }
@@ -796,17 +821,21 @@ ecall_iwasm_main(uint8_t *wasm_file_buf, uint32_t wasm_file_size)
         goto fail1;
     }
 
-    /* instantiate the module */
+    /* instantiate the module with larger stack and heap */
     if (!(wasm_module_inst =
-              wasm_runtime_instantiate(wasm_module, 16 * 1024, 16 * 1024,
+              wasm_runtime_instantiate(wasm_module, 64 * 1024, 128 * 1024,
                                        error_buf, sizeof(error_buf)))) {
+        enclave_print("Failed to instantiate WASM module: ");
         enclave_print(error_buf);
         enclave_print("\n");
         goto fail2;
     }
+    enclave_print("WASM module instantiated successfully with 64MB stack and 128MB heap\n");
 
     /* execute the main function of wasm app */
+    enclave_print("DEBUG: Before executing main\n");
     wasm_application_execute_main(wasm_module_inst, 0, NULL);
+    enclave_print("DEBUG: After executing main\n");
     if ((exception = wasm_runtime_get_exception(wasm_module_inst))) {
         enclave_print(exception);
         enclave_print("\n");

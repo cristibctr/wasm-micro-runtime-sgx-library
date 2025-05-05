@@ -576,7 +576,7 @@ unless used elsewhere */
 #endif
 
 #ifndef WASM_ENABLE_REF_TYPES
-#define WASM_ENABLE_REF_TYPES 0
+#define WASM_ENABLE_REF_TYPES 1
 #endif
 
 #ifndef WASM_ENABLE_GC

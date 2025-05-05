@@ -2,9 +2,9 @@
 <EnclaveConfiguration>
   <ProdID>0</ProdID>
   <ISVSVN>0</ISVSVN>
-  <StackMaxSize>0x100000</StackMaxSize>
-  <HeapMaxSize>0x8000000</HeapMaxSize>
-  <ReservedMemMaxSize>0x1000000</ReservedMemMaxSize>
+  <StackMaxSize>0x8000000</StackMaxSize>
+  <HeapMaxSize>0x10000000</HeapMaxSize>
+  <ReservedMemMaxSize>0x10000000</ReservedMemMaxSize>
   <ReservedMemExecutable>1</ReservedMemExecutable>
   <TCSNum>10</TCSNum>
   <TCSPolicy>1</TCSPolicy>
