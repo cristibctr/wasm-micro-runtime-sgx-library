@@ -58,6 +58,20 @@ typedef struct {
 
 /* Implementation of new ECALLs for Rust FFI library interface */
 
+static int
+wasm_enclave_print(wasm_exec_env_t exec_env, const char *message)
+{
+    return enclave_print(message);
+}
+
+static NativeSymbol native_symbols[] = {
+    {
+        "enclave_print",
+        (void *)wasm_enclave_print,
+        "($)i"
+    }
+};
+
 int 
 ecall_init_runtime(uint32_t max_thread_num)
 {
@@ -85,6 +99,13 @@ ecall_init_runtime(uint32_t max_thread_num)
     /* initialize runtime environment */
     if (!wasm_runtime_full_init(&init_args)) {
         LOG_ERROR("Init runtime environment failed.\n");
+        return -1;
+    }
+
+    if (!wasm_runtime_register_natives("env", native_symbols, 
+                                      sizeof(native_symbols) / sizeof(native_symbols[0]))) {
+        LOG_ERROR("Failed to register native functions.\n");
+        wasm_runtime_destroy();
         return -1;
     }
 
@@ -226,7 +247,7 @@ ecall_call_function(uint64_t instance_handle,
     bool ret = false;
     
     void *stack_ptr = __builtin_frame_address(0);
-    enclave_print("[SGX Enclave] ecall_call_function entry\n");
+//    enclave_print("[SGX Enclave] ecall_call_function entry\n");
     
     if (!runtime_inited || !module_inst) {
         if (error_buf && error_buf_size > 0) {
@@ -244,7 +265,7 @@ ecall_call_function(uint64_t instance_handle,
     result_values = (wamr_sgx_val_t*)results;
     result_count = results_size / sizeof(wamr_sgx_val_t);
     
-    enclave_print("[SGX Enclave] Looking up function\n");
+//    enclave_print("[SGX Enclave] Looking up function\n");
     
     char *func_name_copy = NULL;
     size_t func_name_len = strlen(function_name);
@@ -263,7 +284,7 @@ ecall_call_function(uint64_t instance_handle,
     
     memcpy(func_name_copy, function_name, func_name_len + 1);
 
-    enclave_print("[SGX Enclave] calling wasm_runtime_lookup_function\n");
+//    enclave_print("[SGX Enclave] calling wasm_runtime_lookup_function\n");
     func = wasm_runtime_lookup_function(module_inst, func_name_copy);
     wasm_runtime_free(func_name_copy);
     
@@ -278,7 +299,7 @@ ecall_call_function(uint64_t instance_handle,
         return -1;
     }
     
-    enclave_print("[SGX Enclave] Creating execution environment\n");
+//    enclave_print("[SGX Enclave] Creating execution environment\n");
     
     if (!(exec_env = wasm_runtime_create_exec_env(module_inst, 256 * 1024))) {
         if (error_buf && error_buf_size > 0) {
@@ -291,7 +312,7 @@ ecall_call_function(uint64_t instance_handle,
         return -1;
     }
     
-    enclave_print("[SGX Enclave] Setting up parameters\n");
+//    enclave_print("[SGX Enclave] Setting up parameters\n");
     
     if (param_count > 0) {
         wasm_params = (wasm_val_t*)wasm_runtime_malloc(sizeof(wasm_val_t) * param_count);
@@ -342,7 +363,7 @@ ecall_call_function(uint64_t instance_handle,
         }
     }
     
-    enclave_print("[SGX Enclave] Setting up result buffer\n");
+//    enclave_print("[SGX Enclave] Setting up result buffer\n");
     
     if (result_count > 0) {
         wasm_results = (wasm_val_t*)wasm_runtime_malloc(sizeof(wasm_val_t) * result_count);
@@ -363,15 +384,15 @@ ecall_call_function(uint64_t instance_handle,
         memset(wasm_results, 0, sizeof(wasm_val_t) * result_count);
     }
     
-    enclave_print("[SGX Enclave] Calling WASM function\n");
+//    enclave_print("[SGX Enclave] Calling WASM function\n");
     
     ret = wasm_runtime_call_wasm_a(exec_env, func, result_count, wasm_results, param_count, wasm_params);
     
     if (ret) {
-        enclave_print("[SGX Enclave] Function call succeeded\n");
+//        enclave_print("[SGX Enclave] Function call succeeded\n");
     }
     else {
-        enclave_print("[SGX Enclave] Function call failed\n");
+//        enclave_print("[SGX Enclave] Function call failed\n");
     }
     
     if (!ret) {
@@ -382,7 +403,7 @@ ecall_call_function(uint64_t instance_handle,
             memcpy(error_buf, exception, copy_len);
             error_buf[copy_len] = '\0';
             
-            enclave_print("[SGX Enclave] Exception occurred\n");
+//            enclave_print("[SGX Enclave] Exception occurred\n");
         } 
         else if (error_buf && error_buf_size > 0) {
             const char *error_msg = "Unknown error calling function";
@@ -391,7 +412,7 @@ ecall_call_function(uint64_t instance_handle,
             memcpy(error_buf, error_msg, copy_len);
             error_buf[copy_len] = '\0';
             
-            enclave_print("[SGX Enclave] Unknown error calling function\n");
+//            enclave_print("[SGX Enclave] Unknown error calling function\n");
         }
         
         if (wasm_params)
@@ -402,7 +423,7 @@ ecall_call_function(uint64_t instance_handle,
         return -1;
     }
     
-    enclave_print("[SGX Enclave] Processing results\n");
+//    enclave_print("[SGX Enclave] Processing results\n");
     
     for (i = 0; i < result_count; i++) {
         switch (wasm_results[i].kind) {
@@ -434,7 +455,7 @@ ecall_call_function(uint64_t instance_handle,
         }
     }
     
-    enclave_print("[SGX Enclave] Cleanup and exit\n");
+//    enclave_print("[SGX Enclave] Cleanup and exit\n");
     
     if (wasm_params)
         wasm_runtime_free(wasm_params);

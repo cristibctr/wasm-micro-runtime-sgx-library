@@ -391,17 +391,17 @@ handle_cmd_instantiate_module(uint64 *args, uint32 argc)
         heap_size = 8 * 1024 * 1024;
     }
     
-    snprintf(msg_buf, sizeof(msg_buf), 
-             "[SGX Enclave] Instantiating module with stack: %d KB, heap: %d KB\n", 
-             stack_size / 1024, heap_size / 1024);
+//    snprintf(msg_buf, sizeof(msg_buf),
+//             "[SGX Enclave] Instantiating module with stack: %d KB, heap: %d KB\n",
+//             stack_size / 1024, heap_size / 1024);
     enclave_print(msg_buf);
 
     if (!(module_inst =
               wasm_runtime_instantiate(enclave_module->module, stack_size,
                                        heap_size, error_buf, error_buf_size))) {
-        enclave_print("[SGX Enclave] Failed to instantiate module\n");
+//        enclave_print("[SGX Enclave] Failed to instantiate module\n");
         if (error_buf && error_buf[0]) {
-            enclave_print("[SGX Enclave] Error: ");
+//            enclave_print("[SGX Enclave] Error: ");
             enclave_print(error_buf);
             enclave_print("\n");
         }
@@ -409,7 +409,7 @@ handle_cmd_instantiate_module(uint64 *args, uint32 argc)
         return;
     }
 
-    enclave_print("[SGX Enclave] Module instantiated successfully\n");
+//    enclave_print("[SGX Enclave] Module instantiated successfully\n");
     *(wasm_module_inst_t *)args_org = module_inst;
 
     LOG_VERBOSE("Instantiate module success.\n");

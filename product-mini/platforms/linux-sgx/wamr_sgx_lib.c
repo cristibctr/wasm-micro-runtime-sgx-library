@@ -323,17 +323,17 @@ wamr_sgx_destroy_instance(
     }
     
     pthread_mutex_lock(&context->mutex);
-    printf("[SGX Call] Mutex acquired, calling function in enclave\n");
+//    printf("[SGX Call] Mutex acquired, calling function in enclave\n");
 
-    printf("C sizeof(wamr_sgx_val_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_val_t),
-           _Alignof(wamr_sgx_val_t));
-    printf("C sizeof(wamr_sgx_context_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_context_t),
-           _Alignof(wamr_sgx_context_t));
-    printf("C sizeof(wamr_sgx_instance_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_instance_t),
-           _Alignof(wamr_sgx_instance_t));
+//    printf("C sizeof(wamr_sgx_val_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_val_t),
+//           _Alignof(wamr_sgx_val_t));
+//    printf("C sizeof(wamr_sgx_context_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_context_t),
+//           _Alignof(wamr_sgx_context_t));
+//    printf("C sizeof(wamr_sgx_instance_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_instance_t),
+//           _Alignof(wamr_sgx_instance_t));
     sgx_ret = ecall_destroy_instance(context->eid, &enclave_ret, instance->handle);
     
     pthread_mutex_unlock(&context->mutex);
@@ -357,8 +357,20 @@ wamr_sgx_call_function(
     sgx_status_t sgx_ret;
     int enclave_ret;
     
-    printf("[SGX Call] Entering wamr_sgx_call_function for function: %s\n", function_name);
-    printf("[SGX Call] Parameters: count=%zu, results expected: %zu\n", param_count, result_count);
+//    printf("[SGX Call] Entering wamr_sgx_call_function for function: %s\n", function_name);
+//    printf("[SGX Call] Parameters: count=%zu, results expected: %zu\n", param_count, result_count);
+    if(!context) {
+        printf("[SGX Call] ERROR: no context\n");
+    } else
+    if(!instance) {
+        printf("[SGX Call] ERROR: no instance\n");
+    } else
+    if(instance->context != context) {
+        printf("[SGX Call] ERROR: instance->context != context\n");
+    } else
+    if(!function_name) {
+        printf("[SGX Call] ERROR: no function_name\n");
+    }
     
     if (!context || !instance || instance->context != context || !function_name) {
         printf("[SGX Call] ERROR: Invalid arguments\n");
@@ -378,24 +390,24 @@ wamr_sgx_call_function(
     pthread_getattr_np(pthread_self(), &attr);
     pthread_attr_getstack(&attr, &stackaddr, &stack_size);
     stack_ptr = __builtin_frame_address(0);
-    printf("[SGX Call] Stack info: current=%p, base=%p, size=%zu, used=%zu\n", 
-           stack_ptr, stackaddr, stack_size, 
-           (size_t)((char*)stackaddr + stack_size - (char*)stack_ptr));
+//    printf("[SGX Call] Stack info: current=%p, base=%p, size=%zu, used=%zu\n",
+//           stack_ptr, stackaddr, stack_size,
+//           (size_t)((char*)stackaddr + stack_size - (char*)stack_ptr));
     pthread_attr_destroy(&attr);
     #endif
     
-    printf("[SGX Call] Acquiring mutex\n");
+//    printf("[SGX Call] Acquiring mutex\n");
     pthread_mutex_lock(&context->mutex);
     
-    printf("C sizeof(wamr_sgx_val_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_val_t),
-           _Alignof(wamr_sgx_val_t));
-    printf("C sizeof(wamr_sgx_context_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_context_t),
-           _Alignof(wamr_sgx_context_t));
-    printf("C sizeof(wamr_sgx_instance_t) = %zu, align = %zu\n",
-           sizeof(wamr_sgx_instance_t),
-           _Alignof(wamr_sgx_instance_t));
+//    printf("C sizeof(wamr_sgx_val_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_val_t),
+//           _Alignof(wamr_sgx_val_t));
+//    printf("C sizeof(wamr_sgx_context_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_context_t),
+//           _Alignof(wamr_sgx_context_t));
+//    printf("C sizeof(wamr_sgx_instance_t) = %zu, align = %zu\n",
+//           sizeof(wamr_sgx_instance_t),
+//           _Alignof(wamr_sgx_instance_t));
            
     uint8_t *params_buf = NULL;
     uint8_t *results_buf = NULL;
@@ -450,11 +462,11 @@ wamr_sgx_call_function(
         free(results_buf);
     }
     
-    printf("[SGX Call] Function call completed, SGX status: %d, Enclave return: %d\n", 
-           sgx_ret, enclave_ret);
+//    printf("[SGX Call] Function call completed, SGX status: %d, Enclave return: %d\n",
+//           sgx_ret, enclave_ret);
     
     pthread_mutex_unlock(&context->mutex);
-    printf("[SGX Call] Mutex released\n");
+//    printf("[SGX Call] Mutex released\n");
     
     if (sgx_ret != SGX_SUCCESS) {
         printf("[SGX Call] ERROR: SGX error occurred: %d (0x%x)\n", sgx_ret, sgx_ret);
@@ -482,7 +494,7 @@ wamr_sgx_call_function(
         return WAMR_SGX_ERROR_EXECUTION;
     }
     
-    printf("[SGX Call] Function executed successfully\n");
+//    printf("[SGX Call] Function executed successfully\n");
     return WAMR_SGX_SUCCESS;
 }
 
